@@ -2,6 +2,7 @@ import os
 import json
 import asyncio
 import sys
+from contextlib import contextmanager
 import readline
 import argparse
 import importlib.util
@@ -17,6 +18,30 @@ from langchain_mcp_tools import convert_mcp_to_langchain_tools
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
+
+# ANSI escape codes
+class Style:
+    GREY = '\033[38;5;245m'  # Grey text for tools
+    AI = '\033[38;5;39m'  # Light blue text for AI
+    RESET = '\033[0m'
+
+@contextmanager
+def style_tools():
+    """Grey text for tool output"""
+    print(Style.GREY, end='', flush=True)
+    try:
+        yield
+    finally:
+        print(Style.RESET, end='', flush=True)
+
+@contextmanager
+def style_ai():
+    """Light blue text for AI output"""
+    print(Style.AI, end='', flush=True)
+    try:
+        yield
+    finally:
+        print(Style.RESET, end='', flush=True)
 
 def p(*args, **kwargs):
     kwargs["flush"] = True
@@ -35,7 +60,7 @@ def load_tools_from_file(filepath: str) -> List:
 
     return [getattr(module, name) for name in module.__all__]
 
-async def init(mcp_config_file: str = None, tool_files: List[str] = None):
+async def init(mcp_config_file: str, tool_files: List[str] = None):
     llm = ChatAnthropic(model="claude-3-5-sonnet-latest", api_key=os.environ["ANTHROPIC_API_KEY"])
 
     tools = []
@@ -74,21 +99,24 @@ async def invoke(query, agent):
                     if prev_event and prev_event != "on_chat_model_stream":
                         text = "\n\n" + text.lstrip()
 
-                    p(f"{text}", end="")
+                    with style_ai():
+                        p(f"{text}", end="")
         elif event["event"] == "on_tool_start":
             signature = ", ".join("=".join((k, repr(v))) for k, v in event['data'].get('input', {}).items())
-            p(f"\n\ntool call: {event['name']}({signature})")
-            approval = input("approve? (y/n): ").lower().strip()
-            if approval != 'y':
-                p("tool call cancelled")
-                return
+            with style_tools():
+                p(f"\n\ntool call: {event['name']}({signature})")
+                approval = input("approve? (y/n): ").lower().strip()
+                if approval != 'y':
+                    p("tool call cancelled")
+                    return
         elif event["event"] == "on_tool_end":
             try:
                 tool_result = event['data']['output'].content
 
             except (KeyError, TypeError, AttributeError):
                 tool_result = f"Event data error: {event}"
-            p(f"{event['name']} tool result: {tool_result}", end="")
+            with style_tools():
+                p(f"{event['name']} tool result: {tool_result}", end="")
         else:
             pass
         if event["event"] in {"on_chat_model_stream", "on_tool_start", "on_tool_end"}:
@@ -122,7 +150,7 @@ async def chat(mcp_config: str = None, tool_files: List[str] = None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='A terminal LLM chat app with support for langchain tools and mcp servers')
-    parser.add_argument('--mcp-config', type=str, help='Path to MCP config JSON file')
+    parser.add_argument('--mcp-config', type=str, help='Path to MCP config JSON file', required=True)
     parser.add_argument('--langchain-tools', type=str, action='append', help='Path to langchain tools Python file')
 
     args = parser.parse_args()

@@ -10,7 +10,7 @@ def add(a: int, b: int) -> int:
         a: first int
         b: second int
     """
-    return a * b
+    return a + b
 
 @tool
 def multiply(a: int, b: int) -> int:
