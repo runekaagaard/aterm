@@ -1,0 +1,18 @@
+[project]
+name = "aterm"
+version = "0.1.0"
+description = "A terminal LLM chat app with support for langchain tools and mcp servers"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "langchain-mcp-tools",
+    "langchain>=0.3.17",
+    "langchain-anthropic>=0.3.5",
+    "langgraph>=0.2.69",
+    "mcp[cli]>=1.2.1",
+    "prompt-toolkit>=3.0.50",
+    "termcolor>=2.5.0",
+]
+
+[tool.uv.sources]
+langchain-mcp-tools = { git = "https://github.com/runekaagaard/langchain-mcp-tools-py" }
